@@ -11,3 +11,7 @@ crate-type = ["cdylib"]
 pyo3 = { version = "0.21.2", features = ["extension-module"] }
 arrow = { version = "54", default-features = false, features = ["prettyprint"] }
 parquet = { version = "54", default-features = false, features = ["arrow", "snap", "zstd", "lz4"] }
+nalgebra = "0.33"
+statrs = "0.17"
+rayon = "1.10"
+csv = "1"

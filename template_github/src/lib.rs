@@ -16,6 +16,7 @@ use parquet::file::properties::WriterProperties;
 use std::fs::File;
 use std::sync::Arc;
 
+mod coint;
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -592,6 +593,7 @@ fn template_rust_module(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(generate_dollar_bars, m)?)?;
     m.add_function(wrap_pyfunction!(calculate_thresholds, m)?)?;
     m.add_function(wrap_pyfunction!(parquet_info, m)?)?;
+    coint::register(m)?;
     Ok(())
 }
 
