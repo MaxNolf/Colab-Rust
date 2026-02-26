@@ -3,6 +3,7 @@ use pyo3::exceptions::PyValueError;
 
 use arrow::array::{
     Float64Array, Float64Builder, Int64Array, Int64Builder, UInt64Builder,
+    TimestampMillisecondArray, TimestampMicrosecondArray, TimestampNanosecondArray, TimestampSecondArray,
 };
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
@@ -222,40 +223,47 @@ where
     for batch_result in reader {
         let batch = batch_result.map_err(|e| format!("Erro ao ler batch: {e}"))?;
 
-        let time_col = batch
-            .column_by_name("time")
-            .ok_or("Coluna 'time' não encontrada")?
-            .as_any()
-            .downcast_ref::<Int64Array>()
-            .ok_or("Coluna 'time' não é Int64")?;
-
-        let price_col = batch
-            .column_by_name("price")
-            .ok_or("Coluna 'price' não encontrada")?
-            .as_any()
-            .downcast_ref::<Float64Array>()
-            .ok_or("Coluna 'price' não é Float64")?;
-
-        let qty_col = batch
-            .column_by_name("qty")
-            .ok_or("Coluna 'qty' não encontrada")?
-            .as_any()
-            .downcast_ref::<Float64Array>()
-            .ok_or("Coluna 'qty' não é Float64")?;
-
-        let quote_qty_col = batch
-            .column_by_name("quoteQty")
-            .ok_or("Coluna 'quoteQty' não encontrada")?
-            .as_any()
-            .downcast_ref::<Float64Array>()
-            .ok_or("Coluna 'quoteQty' não é Float64")?;
+        let datetime_col = batch
+            .column_by_name("DateTime")
+            .ok_or("Coluna 'DateTime' não encontrada")?;
 
         let num_rows = batch.num_rows();
+        let mut time_values: Vec<i64> = Vec::with_capacity(num_rows);
+        
+        let any_col = datetime_col.as_any();
+        if let Some(arr) = any_col.downcast_ref::<Int64Array>() {
+            for i in 0..arr.len() { time_values.push(arr.value(i)); }
+        } else if let Some(arr) = any_col.downcast_ref::<TimestampMillisecondArray>() {
+            for i in 0..arr.len() { time_values.push(arr.value(i)); }
+        } else if let Some(arr) = any_col.downcast_ref::<TimestampMicrosecondArray>() {
+            for i in 0..arr.len() { time_values.push(arr.value(i) / 1000); }
+        } else if let Some(arr) = any_col.downcast_ref::<TimestampNanosecondArray>() {
+            for i in 0..arr.len() { time_values.push(arr.value(i) / 1_000_000); }
+        } else if let Some(arr) = any_col.downcast_ref::<TimestampSecondArray>() {
+            for i in 0..arr.len() { time_values.push(arr.value(i) * 1000); }
+        } else {
+            return Err(format!("Tipo não suportado na coluna 'DateTime': {:?}", datetime_col.data_type()));
+        }
+
+        let price_col = batch
+            .column_by_name("Price")
+            .ok_or("Coluna 'Price' não encontrada")?
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .ok_or("Coluna 'Price' não é Float64")?;
+
+        let qty_col = batch
+            .column_by_name("Qty")
+            .ok_or("Coluna 'Qty' não encontrada")?
+            .as_any()
+            .downcast_ref::<Float64Array>()
+            .ok_or("Coluna 'Qty' não é Float64")?;
+
         for i in 0..num_rows {
-            let time = time_col.value(i);
+            let time = time_values[i];
             let price = price_col.value(i);
             let qty = qty_col.value(i);
-            let quote_qty = quote_qty_col.value(i);
+            let quote_qty = price * qty;
             callback(time, price, qty, quote_qty)?;
         }
     }
@@ -587,10 +595,10 @@ mod tests {
     fn create_test_parquet(path: &str, n: usize) {
         let schema = Arc::new(Schema::new(vec![
             Field::new("id", DataType::Int64, false),
-            Field::new("price", DataType::Float64, false),
-            Field::new("qty", DataType::Float64, false),
+            Field::new("Price", DataType::Float64, false),
+            Field::new("Qty", DataType::Float64, false),
             Field::new("quoteQty", DataType::Float64, false),
-            Field::new("time", DataType::Int64, false),
+            Field::new("DateTime", DataType::Int64, false),
             Field::new("isBuyerMaker", DataType::Boolean, false),
             Field::new("isBestMatch", DataType::Boolean, false),
         ]));
