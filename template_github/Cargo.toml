@@ -1,0 +1,11 @@
+[package]
+name = "template_rust_module"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "template_rust_module"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.21.2", features = ["extension-module"] }
