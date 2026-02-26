@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 use pyo3::exceptions::PyValueError;
 
 use arrow::array::{
-    Float64Array, Float64Builder, Int64Array, Int64Builder, UInt64Builder,
+    Float64Array, Float32Array, Float64Builder, Int64Array, Int64Builder, UInt64Builder,
     TimestampMillisecondArray, TimestampMicrosecondArray, TimestampNanosecondArray, TimestampSecondArray,
 };
 use arrow::datatypes::{DataType, Field, Schema};
@@ -247,22 +247,36 @@ where
 
         let price_col = batch
             .column_by_name("Price")
-            .ok_or("Coluna 'Price' não encontrada")?
-            .as_any()
-            .downcast_ref::<Float64Array>()
-            .ok_or("Coluna 'Price' não é Float64")?;
-
+            .ok_or("Coluna 'Price' não encontrada")?;
+        
         let qty_col = batch
             .column_by_name("Qty")
-            .ok_or("Coluna 'Qty' não encontrada")?
-            .as_any()
-            .downcast_ref::<Float64Array>()
-            .ok_or("Coluna 'Qty' não é Float64")?;
+            .ok_or("Coluna 'Qty' não encontrada")?;
+
+        let mut price_values: Vec<f64> = Vec::with_capacity(num_rows);
+        let any_price = price_col.as_any();
+        if let Some(arr) = any_price.downcast_ref::<Float64Array>() {
+            for i in 0..arr.len() { price_values.push(arr.value(i)); }
+        } else if let Some(arr) = any_price.downcast_ref::<Float32Array>() {
+            for i in 0..arr.len() { price_values.push(arr.value(i) as f64); }
+        } else {
+            return Err(format!("Tipo não suportado na coluna 'Price': {:?}", price_col.data_type()));
+        }
+
+        let mut qty_values: Vec<f64> = Vec::with_capacity(num_rows);
+        let any_qty = qty_col.as_any();
+        if let Some(arr) = any_qty.downcast_ref::<Float64Array>() {
+            for i in 0..arr.len() { qty_values.push(arr.value(i)); }
+        } else if let Some(arr) = any_qty.downcast_ref::<Float32Array>() {
+            for i in 0..arr.len() { qty_values.push(arr.value(i) as f64); }
+        } else {
+            return Err(format!("Tipo não suportado na coluna 'Qty': {:?}", qty_col.data_type()));
+        }
 
         for i in 0..num_rows {
             let time = time_values[i];
-            let price = price_col.value(i);
-            let qty = qty_col.value(i);
+            let price = price_values[i];
+            let qty = qty_values[i];
             let quote_qty = price * qty;
             callback(time, price, qty, quote_qty)?;
         }
